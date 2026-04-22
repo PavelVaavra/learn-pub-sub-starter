@@ -3,9 +3,8 @@ package main
 import (
 	"fmt"
 	"log"
-	"os"
-	"os/signal"
 
+	"github.com/bootdotdev/learn-pub-sub-starter/internal/gamelogic"
 	"github.com/bootdotdev/learn-pub-sub-starter/internal/pubsub"
 	"github.com/bootdotdev/learn-pub-sub-starter/internal/routing"
 	amqp "github.com/rabbitmq/amqp091-go"
@@ -28,13 +27,30 @@ func main() {
 		return
 	}
 
-	pubsub.PublishJSON(ch, routing.ExchangePerilDirect, routing.PauseKey, routing.PlayingState{
-		IsPaused: true,
-	})
+	gamelogic.PrintServerHelp()
 
-	// wait for ctrl+c
-	signalChan := make(chan os.Signal, 1)
-	signal.Notify(signalChan, os.Interrupt)
-	<-signalChan
-	fmt.Println("Shutting down Peril server...")
+	for true {
+		words := gamelogic.GetInput()
+		if len(words) == 0 {
+			continue
+		}
+		cmd := words[0]
+		switch cmd {
+		case "pause":
+			pubsub.PublishJSON(ch, routing.ExchangePerilDirect, routing.PauseKey, routing.PlayingState{
+				IsPaused: true,
+			})
+			fmt.Println("Pause message sent")
+		case "resume":
+			pubsub.PublishJSON(ch, routing.ExchangePerilDirect, routing.PauseKey, routing.PlayingState{
+				IsPaused: false,
+			})
+			fmt.Println("Resume message sent")
+		case "quit":
+			fmt.Println("Quitting Peril server...")
+			return
+		default:
+			fmt.Printf("Unknown command: %s\n", cmd)
+		}
+	}
 }
