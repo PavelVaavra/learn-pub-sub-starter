@@ -28,7 +28,7 @@ func main() {
 		return
 	}
 
-	ch, _, err := pubsub.DeclareAndBind(
+	_, queue, err := pubsub.DeclareAndBind(
 		conn,
 		routing.ExchangePerilDirect,
 		strings.Join([]string{routing.PauseKey, username}, "."),
@@ -39,7 +39,7 @@ func main() {
 		log.Fatalf("Error declaring and binding queue: %v", err)
 		return
 	}
-	defer ch.Close()
+	fmt.Printf("Queue %v declared and bound!\n", queue.Name)
 
 	gameState := gamelogic.NewGameState(username)
 
