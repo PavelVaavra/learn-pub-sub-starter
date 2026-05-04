@@ -3,13 +3,19 @@ package main
 import (
 	"fmt"
 	"log"
-	"strings"
 
 	"github.com/bootdotdev/learn-pub-sub-starter/internal/gamelogic"
 	"github.com/bootdotdev/learn-pub-sub-starter/internal/pubsub"
 	"github.com/bootdotdev/learn-pub-sub-starter/internal/routing"
 	amqp "github.com/rabbitmq/amqp091-go"
 )
+
+func handlerPause(gs *gamelogic.GameState) func(routing.PlayingState) {
+	return func(state routing.PlayingState) {
+		defer fmt.Print("> ")
+		gs.HandlePause(state)
+	}
+}
 
 func main() {
 	fmt.Println("Starting Peril client...")
@@ -28,20 +34,19 @@ func main() {
 		return
 	}
 
-	_, queue, err := pubsub.DeclareAndBind(
+	gameState := gamelogic.NewGameState(username)
+	err = pubsub.SubscribeJSON(
 		conn,
 		routing.ExchangePerilDirect,
-		strings.Join([]string{routing.PauseKey, username}, "."),
+		routing.PauseKey+"."+gameState.GetUsername(),
 		routing.PauseKey,
 		pubsub.Transient,
+		handlerPause(gameState),
 	)
 	if err != nil {
-		log.Fatalf("Error declaring and binding queue: %v", err)
+		log.Fatalf("Error subscribing to pause messages: %v", err)
 		return
 	}
-	fmt.Printf("Queue %v declared and bound!\n", queue.Name)
-
-	gameState := gamelogic.NewGameState(username)
 
 	for true {
 		words := gamelogic.GetInput()
@@ -53,12 +58,14 @@ func main() {
 		case "spawn":
 			err := gameState.CommandSpawn(words)
 			if err != nil {
-				log.Fatalf("Error executing spawn command: %v", err)
+				fmt.Println(err)
+				continue
 			}
 		case "move":
 			_, err := gameState.CommandMove(words)
 			if err != nil {
-				log.Fatalf("Error executing move command: %v", err)
+				fmt.Println(err)
+				continue
 			}
 		case "status":
 			gameState.CommandStatus()
