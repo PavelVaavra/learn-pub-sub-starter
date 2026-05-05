@@ -10,6 +10,18 @@ import (
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
+func handlerGameLog() func(routing.GameLog) pubsub.Acktype {
+	return func(gl routing.GameLog) pubsub.Acktype {
+		defer fmt.Print("> ")
+		err := gamelogic.WriteLog(gl)
+		if err != nil {
+			fmt.Printf("Error writing log: %v\n", err)
+			return pubsub.NackRequeue
+		}
+		return pubsub.Ack
+	}
+}
+
 func main() {
 	fmt.Println("Starting Peril server...")
 	url := "amqp://guest:guest@localhost:5672/"
@@ -21,18 +33,31 @@ func main() {
 	defer conn.Close()
 	fmt.Println("Connected to RabbitMQ")
 
-	ch, queue, err := pubsub.DeclareAndBind(
+	// ch, queue, err := pubsub.DeclareAndBind(
+	// 	conn,
+	// 	routing.ExchangePerilTopic,
+	// 	routing.GameLogSlug,
+	// 	"game_logs.*",
+	// 	pubsub.Durable,
+	// )
+	// if err != nil {
+	// 	log.Fatalf("Error declaring and binding queue: %v", err)
+	// 	return
+	// }
+	// fmt.Printf("Queue %v declared and bound!\n", queue.Name)
+
+	err = pubsub.SubscribeGob(
 		conn,
 		routing.ExchangePerilTopic,
 		routing.GameLogSlug,
-		"game_logs.*",
+		routing.GameLogSlug+".*",
 		pubsub.Durable,
+		handlerGameLog(),
 	)
 	if err != nil {
-		log.Fatalf("Error declaring and binding queue: %v", err)
+		log.Fatalf("Error subscribing to game logs: %v", err)
 		return
 	}
-	fmt.Printf("Queue %v declared and bound!\n", queue.Name)
 
 	gamelogic.PrintServerHelp()
 

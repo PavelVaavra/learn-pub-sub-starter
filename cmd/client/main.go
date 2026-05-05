@@ -59,7 +59,7 @@ func handlerWar(gs *gamelogic.GameState, ch *amqp.Channel) func(gamelogic.Recogn
 		case gamelogic.WarOutcomeNoUnits:
 			return pubsub.NackDiscard
 		case gamelogic.WarOutcomeOpponentWon:
-			message := winner + "won a war against " + loser
+			message := winner + " won a war against " + loser
 			err := PublishGameLog(ch, routing.ExchangePerilTopic, routing.GameLogSlug+"."+gs.GetUsername(), gs.GetUsername(), message)
 			if err != nil {
 				fmt.Printf("error: %s\n", err)
