@@ -148,6 +148,11 @@ func SubscribeGob[T any](
 		return fmt.Errorf("could not declare and bind queue: %v", err)
 	}
 
+	err = ch.Qos(10, 0, false)
+	if err != nil {
+		return fmt.Errorf("could not set QoS: %v", err)
+	}
+
 	delivery, err := ch.Consume(queue.Name, "", false, false, false, false, nil)
 	if err != nil {
 		return fmt.Errorf("could not consume from queue: %v", err)
