@@ -33,18 +33,18 @@ func main() {
 	defer conn.Close()
 	fmt.Println("Connected to RabbitMQ")
 
-	// ch, queue, err := pubsub.DeclareAndBind(
-	// 	conn,
-	// 	routing.ExchangePerilTopic,
-	// 	routing.GameLogSlug,
-	// 	"game_logs.*",
-	// 	pubsub.Durable,
-	// )
-	// if err != nil {
-	// 	log.Fatalf("Error declaring and binding queue: %v", err)
-	// 	return
-	// }
-	// fmt.Printf("Queue %v declared and bound!\n", queue.Name)
+	ch, queue, err := pubsub.DeclareAndBind(
+		conn,
+		routing.ExchangePerilTopic,
+		routing.GameLogSlug,
+		"game_logs.*",
+		pubsub.Durable,
+	)
+	if err != nil {
+		log.Fatalf("Error declaring and binding queue: %v", err)
+		return
+	}
+	fmt.Printf("Queue %v declared and bound!\n", queue.Name)
 
 	err = pubsub.SubscribeGob(
 		conn,
