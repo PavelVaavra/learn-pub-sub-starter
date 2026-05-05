@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"log"
+	"time"
 
 	"github.com/bootdotdev/learn-pub-sub-starter/internal/gamelogic"
 	"github.com/bootdotdev/learn-pub-sub-starter/internal/pubsub"
@@ -48,25 +49,55 @@ func handlerMove(gs *gamelogic.GameState, ch *amqp.Channel) func(gamelogic.ArmyM
 	}
 }
 
-func handlerWar(gs *gamelogic.GameState) func(gamelogic.RecognitionOfWar) pubsub.Acktype {
+func handlerWar(gs *gamelogic.GameState, ch *amqp.Channel) func(gamelogic.RecognitionOfWar) pubsub.Acktype {
 	return func(recognition gamelogic.RecognitionOfWar) pubsub.Acktype {
 		defer fmt.Print("> ")
-		warOutcome, _, _ := gs.HandleWar(recognition)
+		warOutcome, winner, loser := gs.HandleWar(recognition)
 		switch warOutcome {
 		case gamelogic.WarOutcomeNotInvolved:
 			return pubsub.NackRequeue
 		case gamelogic.WarOutcomeNoUnits:
 			return pubsub.NackDiscard
 		case gamelogic.WarOutcomeOpponentWon:
+			message := winner + "won a war against " + loser
+			err := PublishGameLog(ch, routing.ExchangePerilTopic, routing.GameLogSlug+"."+gs.GetUsername(), gs.GetUsername(), message)
+			if err != nil {
+				fmt.Printf("error: %s\n", err)
+				return pubsub.NackRequeue
+			}
 			return pubsub.Ack
 		case gamelogic.WarOutcomeYouWon:
+			message := winner + " won a war against " + loser
+			err := PublishGameLog(ch, routing.ExchangePerilTopic, routing.GameLogSlug+"."+gs.GetUsername(), gs.GetUsername(), message)
+			if err != nil {
+				fmt.Printf("error: %s\n", err)
+				return pubsub.NackRequeue
+			}
 			return pubsub.Ack
 		case gamelogic.WarOutcomeDraw:
+			message := "A war between " + winner + " and " + loser + " resulted in a draw"
+			err := PublishGameLog(ch, routing.ExchangePerilTopic, routing.GameLogSlug+"."+gs.GetUsername(), gs.GetUsername(), message)
+			if err != nil {
+				fmt.Printf("error: %s\n", err)
+				return pubsub.NackRequeue
+			}
 			return pubsub.Ack
 		}
 		fmt.Println("error: unknown war outcome")
 		return pubsub.NackDiscard
 	}
+}
+
+func PublishGameLog(ch *amqp.Channel, exchange, key, username, message string) error {
+	err := pubsub.PublishGob(ch, exchange, key, routing.GameLog{
+		CurrentTime: time.Now(),
+		Message:     message,
+		Username:    username,
+	})
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func main() {
@@ -125,7 +156,7 @@ func main() {
 		routing.WarRecognitionsPrefix,
 		routing.WarRecognitionsPrefix+".*",
 		pubsub.Durable,
-		handlerWar(gameState),
+		handlerWar(gameState, ch),
 	)
 	if err != nil {
 		log.Fatalf("Error subscribing to war messages: %v", err)
